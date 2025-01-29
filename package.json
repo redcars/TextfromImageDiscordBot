@@ -13,6 +13,7 @@
     "discord-reply": "^0.1.2",
     "discord.js": "^14.17.3",
     "dotenv": "^16.4.7",
+    "sharp": "^0.33.5",
     "tesseract.js": "^6.0.0"
   }
 }

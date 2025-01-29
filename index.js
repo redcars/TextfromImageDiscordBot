@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 require('dotenv').config(); // Load environment variables
 const Tesseract = require("tesseract.js"); // Initializing Tesseract for OCR
+const sharp = require("sharp"); // Image processing library
 
 // Define intents
 const intents = [
@@ -15,23 +16,52 @@ bot.on("ready", () => {
     console.log(`Logged in as ${bot.user.tag}!`);
 });
 
-bot.on("messageCreate", (msg) => {
+bot.on("messageCreate", async (msg) => {
     if (msg.attachments.size > 0) { // Detection method for images in msg
-        msg.attachments.forEach((attachment) => {
+        msg.attachments.forEach(async (attachment) => {
             // Get Image URL
             const ImageURL = attachment.proxyURL;
+            
+            try {
+                // Download image
+                const response = await fetch(ImageURL);
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);    
+                
+                // Logging
+                const metadata = await sharp(buffer).metadata();
+                console.log("Image dimensions:", metadata.width, "x", metadata.height);
+                console.log("Image buffer length:", buffer.length);
 
-            // Run image through Tesseract OCR
-            Tesseract.recognize(
-                ImageURL,
+                // Crop image
+                const croppedImageBuffer = await sharp(buffer)
+                .extract({
+                    left: 125,
+                    top: 90,
+                    width: 72,
+                    height: 25,
+                })
+                .toBuffer();
+            // Run cropped image through Tesseract OCR
+            const { data: { text } } = await Tesseract.recognize(
+                croppedImageBuffer,
                 "eng",
                 { logger: (m) => console.log(m) }
-            ).then(({ data: { text } }) => {
-                // Reply with extracted text
-                console.log(text);
-                msg.reply(text);
-            });
-        });
+            );
+
+            const attachment = new Discord.AttachmentBuilder(croppedImageBuffer, { name: "cropped_image.png" });
+            msg.reply({
+                content: `Extracted text: ${text}`,
+                files: [attachment], 
+            })
+
+            // Reply with extracted text
+            console.log(text);
+        } catch (error) {
+            console.error("Error processing image:", error);
+            msg.reply("An error occured while processing the image.")
+        }
+    });
     }
 });
 
